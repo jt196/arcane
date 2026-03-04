@@ -393,12 +393,58 @@ var refreshCmd = &cobra.Command{
 	},
 }
 
+var oidcStatusCmd = &cobra.Command{
+	Use:          "oidc-status",
+	Short:        "Show OIDC configuration status",
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := cmdutil.ClientFromCommand(cmd)
+		if err != nil {
+			return err
+		}
+
+		resp, err := c.Get(cmd.Context(), types.Endpoints.OIDCStatus())
+		if err != nil {
+			return fmt.Errorf("failed to get OIDC status: %w", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		if err := cmdutil.EnsureSuccessStatus(resp); err != nil {
+			return fmt.Errorf("failed to get OIDC status: %w", err)
+		}
+
+		var result struct {
+			EnvForced     bool `json:"envForced"`
+			EnvConfigured bool `json:"envConfigured"`
+			MergeAccounts bool `json:"mergeAccounts"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return fmt.Errorf("failed to parse response: %w", err)
+		}
+
+		if cmdutil.JSONOutputEnabled(cmd) || jsonOutput {
+			resultBytes, err := json.MarshalIndent(result, "", "  ")
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %w", err)
+			}
+			fmt.Println(string(resultBytes))
+			return nil
+		}
+
+		output.Header("OIDC Status")
+		output.KeyValue("Environment Forced", fmt.Sprintf("%t", result.EnvForced))
+		output.KeyValue("Environment Configured", fmt.Sprintf("%t", result.EnvConfigured))
+		output.KeyValue("Merge Accounts", fmt.Sprintf("%t", result.MergeAccounts))
+		return nil
+	},
+}
+
 func init() {
 	AuthCmd.AddCommand(loginCmd)
 	AuthCmd.AddCommand(logoutCmd)
 	AuthCmd.AddCommand(meCmd)
 	AuthCmd.AddCommand(passwordCmd)
 	AuthCmd.AddCommand(refreshCmd)
+	AuthCmd.AddCommand(oidcStatusCmd)
 
 	// Login command flags
 	loginCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
@@ -415,6 +461,7 @@ func init() {
 	// Global JSON output flags
 	logoutCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 	meCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
+	oidcStatusCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 }
 
 func extractDeviceAuthErrorCode(body string) string {

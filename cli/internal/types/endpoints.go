@@ -17,6 +17,7 @@ type ArcaneApiEndpoints struct {
 	// OIDC
 	OIDCDeviceCodeEndpoint  string
 	OIDCDeviceTokenEndpoint string
+	OIDCStatusEndpoint      string
 
 	// API Keys
 	ApiKeysEndpoint string
@@ -27,9 +28,10 @@ type ArcaneApiEndpoints struct {
 	UserEndpoint  string
 
 	// Environments
-	EnvironmentsEndpoint    string
-	EnvironmentEndpoint     string
-	EnvironmentTestEndpoint string
+	EnvironmentsEndpoint       string
+	EnvironmentEndpoint        string
+	EnvironmentTestEndpoint    string
+	EnvironmentVersionEndpoint string
 
 	// Containers
 	ContainersEndpoint       string
@@ -78,12 +80,17 @@ type ArcaneApiEndpoints struct {
 	ProjectRestartEndpoint  string
 	ProjectRedeployEndpoint string
 	ProjectPullEndpoint     string
+	ProjectIncludesEndpoint string
 
 	// System
 	SystemPruneEndpoint              string
 	SystemDockerInfoEndpoint         string
 	SystemContainersStartAllEndpoint string
 	SystemContainersStopAllEndpoint  string
+	SystemStartStoppedEndpoint       string
+	SystemConvertEndpoint            string
+	SystemUpgradeEndpoint            string
+	SystemUpgradeCheckEndpoint       string
 
 	// Updater
 	UpdaterStatusEndpoint  string
@@ -94,11 +101,15 @@ type ArcaneApiEndpoints struct {
 	JobSchedulesEndpoint string
 
 	// Settings
-	SettingsEndpoint string
+	SettingsEndpoint       string
+	SettingsPublicEndpoint string
 
 	// Notifications
-	NotificationsAppriseEndpoint  string
-	NotificationsSettingsEndpoint string
+	NotificationsAppriseEndpoint         string
+	NotificationsAppriseTestEndpoint     string
+	NotificationsSettingsEndpoint        string
+	NotificationSettingsProviderEndpoint string
+	NotificationsTestProviderEndpoint    string
 
 	// Container Registries
 	ContainerRegistriesEndpoint   string
@@ -120,6 +131,8 @@ type ArcaneApiEndpoints struct {
 	TemplateRegistryEndpoint    string
 	TemplatesVariablesEndpoint  string
 	TemplateContentEndpoint     string
+	TemplateDownloadEndpoint    string
+	TemplateFetchEndpoint       string
 
 	// Dashboard
 	DashboardActionItemsEndpoint string
@@ -135,6 +148,22 @@ type ArcaneApiEndpoints struct {
 	// Customization
 	CustomizeCategoriesEndpoint string
 	CustomizeSearchEndpoint     string
+
+	// GitOps Syncs
+	GitOpsSyncsEndpoint       string
+	GitOpsSyncEndpoint        string
+	GitOpsSyncStatusEndpoint  string
+	GitOpsSyncTriggerEndpoint string
+	GitOpsSyncFilesEndpoint   string
+	GitOpsSyncsImportEndpoint string
+
+	// Git Repositories
+	GitRepositoriesEndpoint       string
+	GitRepositoryEndpoint         string
+	GitRepositoryTestEndpoint     string
+	GitRepositoryBranchesEndpoint string
+	GitRepositoryFilesEndpoint    string
+	GitRepositoriesSyncEndpoint   string
 }
 
 // Endpoints contains the defined API endpoints
@@ -151,6 +180,7 @@ var Endpoints = ArcaneApiEndpoints{ //nolint:gosec // static endpoint paths; aut
 	// OIDC
 	OIDCDeviceCodeEndpoint:  "/api/oidc/device/code",
 	OIDCDeviceTokenEndpoint: "/api/oidc/device/token",
+	OIDCStatusEndpoint:      "/api/oidc/status",
 
 	// API Keys
 	ApiKeysEndpoint: "/api/api-keys",
@@ -161,9 +191,10 @@ var Endpoints = ArcaneApiEndpoints{ //nolint:gosec // static endpoint paths; aut
 	UserEndpoint:  "/api/users/%s",
 
 	// Environments
-	EnvironmentsEndpoint:    "/api/environments",
-	EnvironmentEndpoint:     "/api/environments/%s",
-	EnvironmentTestEndpoint: "/api/environments/%s/test",
+	EnvironmentsEndpoint:       "/api/environments",
+	EnvironmentEndpoint:        "/api/environments/%s",
+	EnvironmentTestEndpoint:    "/api/environments/%s/test",
+	EnvironmentVersionEndpoint: "/api/environments/%s/version",
 
 	// Containers
 	ContainersEndpoint:       "/api/environments/%s/containers",
@@ -212,12 +243,17 @@ var Endpoints = ArcaneApiEndpoints{ //nolint:gosec // static endpoint paths; aut
 	ProjectRestartEndpoint:  "/api/environments/%s/projects/%s/restart",
 	ProjectRedeployEndpoint: "/api/environments/%s/projects/%s/redeploy",
 	ProjectPullEndpoint:     "/api/environments/%s/projects/%s/pull",
+	ProjectIncludesEndpoint: "/api/environments/%s/projects/%s/includes",
 
 	// System
 	SystemPruneEndpoint:              "/api/environments/%s/system/prune",
 	SystemDockerInfoEndpoint:         "/api/environments/%s/system/docker/info",
 	SystemContainersStartAllEndpoint: "/api/environments/%s/system/containers/start-all",
 	SystemContainersStopAllEndpoint:  "/api/environments/%s/system/containers/stop-all",
+	SystemStartStoppedEndpoint:       "/api/environments/%s/system/containers/start-stopped",
+	SystemConvertEndpoint:            "/api/environments/%s/system/convert",
+	SystemUpgradeEndpoint:            "/api/environments/%s/system/upgrade",
+	SystemUpgradeCheckEndpoint:       "/api/environments/%s/system/upgrade/check",
 
 	// Updater
 	UpdaterStatusEndpoint:  "/api/environments/%s/updater/status",
@@ -225,14 +261,18 @@ var Endpoints = ArcaneApiEndpoints{ //nolint:gosec // static endpoint paths; aut
 	UpdaterHistoryEndpoint: "/api/environments/%s/updater/history",
 
 	// Job Schedules
-	JobSchedulesEndpoint: "/api/job-schedules",
+	JobSchedulesEndpoint: "/api/environments/%s/job-schedules",
 
 	// Settings
-	SettingsEndpoint: "/api/environments/%s/settings",
+	SettingsEndpoint:       "/api/environments/%s/settings",
+	SettingsPublicEndpoint: "/api/environments/%s/settings/public",
 
 	// Notifications
-	NotificationsAppriseEndpoint:  "/api/environments/%s/notifications/apprise",
-	NotificationsSettingsEndpoint: "/api/environments/%s/notifications/settings",
+	NotificationsAppriseEndpoint:         "/api/environments/%s/notifications/apprise",
+	NotificationsAppriseTestEndpoint:     "/api/environments/%s/notifications/apprise/test",
+	NotificationsSettingsEndpoint:        "/api/environments/%s/notifications/settings",
+	NotificationSettingsProviderEndpoint: "/api/environments/%s/notifications/settings/%s",
+	NotificationsTestProviderEndpoint:    "/api/environments/%s/notifications/test/%s",
 
 	// Container Registries
 	ContainerRegistriesEndpoint:   "/api/container-registries",
@@ -254,6 +294,8 @@ var Endpoints = ArcaneApiEndpoints{ //nolint:gosec // static endpoint paths; aut
 	TemplateRegistryEndpoint:    "/api/templates/registries/%s",
 	TemplatesVariablesEndpoint:  "/api/templates/variables",
 	TemplateContentEndpoint:     "/api/templates/%s/content",
+	TemplateDownloadEndpoint:    "/api/templates/%s/download",
+	TemplateFetchEndpoint:       "/api/templates/fetch",
 
 	// Dashboard
 	DashboardActionItemsEndpoint: "/api/environments/%s/dashboard/action-items",
@@ -269,6 +311,22 @@ var Endpoints = ArcaneApiEndpoints{ //nolint:gosec // static endpoint paths; aut
 	// Customization
 	CustomizeCategoriesEndpoint: "/api/customize/categories",
 	CustomizeSearchEndpoint:     "/api/customize/search",
+
+	// GitOps Syncs
+	GitOpsSyncsEndpoint:       "/api/environments/%s/gitops-syncs",
+	GitOpsSyncEndpoint:        "/api/environments/%s/gitops-syncs/%s",
+	GitOpsSyncStatusEndpoint:  "/api/environments/%s/gitops-syncs/%s/status",
+	GitOpsSyncTriggerEndpoint: "/api/environments/%s/gitops-syncs/%s/sync",
+	GitOpsSyncFilesEndpoint:   "/api/environments/%s/gitops-syncs/%s/files",
+	GitOpsSyncsImportEndpoint: "/api/environments/%s/gitops-syncs/import",
+
+	// Git Repositories
+	GitRepositoriesEndpoint:       "/api/customize/git-repositories",
+	GitRepositoryEndpoint:         "/api/customize/git-repositories/%s",
+	GitRepositoryTestEndpoint:     "/api/customize/git-repositories/%s/test",
+	GitRepositoryBranchesEndpoint: "/api/customize/git-repositories/%s/branches",
+	GitRepositoryFilesEndpoint:    "/api/customize/git-repositories/%s/files",
+	GitRepositoriesSyncEndpoint:   "/api/git-repositories/sync",
 }
 
 // Auth endpoints
@@ -280,6 +338,7 @@ func (e ArcaneApiEndpoints) AuthRefresh() string  { return e.AuthRefreshEndpoint
 // OIDC endpoints
 func (e ArcaneApiEndpoints) OIDCDeviceCode() string  { return e.OIDCDeviceCodeEndpoint }
 func (e ArcaneApiEndpoints) OIDCDeviceToken() string { return e.OIDCDeviceTokenEndpoint }
+func (e ArcaneApiEndpoints) OIDCStatus() string      { return e.OIDCStatusEndpoint }
 
 // API Key endpoints
 func (e ArcaneApiEndpoints) ApiKeys() string         { return e.ApiKeysEndpoint }
@@ -298,6 +357,10 @@ func (e ArcaneApiEndpoints) Environment(id string) string {
 
 func (e ArcaneApiEndpoints) EnvironmentTest(envID string) string {
 	return fmt.Sprintf(e.EnvironmentTestEndpoint, envID)
+}
+
+func (e ArcaneApiEndpoints) EnvironmentVersion(envID string) string {
+	return fmt.Sprintf(e.EnvironmentVersionEndpoint, envID)
 }
 
 // Container endpoints
@@ -448,6 +511,10 @@ func (e ArcaneApiEndpoints) ProjectPull(envID, projectID string) string {
 	return fmt.Sprintf(e.ProjectPullEndpoint, envID, projectID)
 }
 
+func (e ArcaneApiEndpoints) ProjectIncludes(envID, projectID string) string {
+	return fmt.Sprintf(e.ProjectIncludesEndpoint, envID, projectID)
+}
+
 // System endpoints
 func (e ArcaneApiEndpoints) SystemPrune(envID string) string {
 	return fmt.Sprintf(e.SystemPruneEndpoint, envID)
@@ -465,6 +532,22 @@ func (e ArcaneApiEndpoints) SystemContainersStopAll(envID string) string {
 	return fmt.Sprintf(e.SystemContainersStopAllEndpoint, envID)
 }
 
+func (e ArcaneApiEndpoints) SystemStartStopped(envID string) string {
+	return fmt.Sprintf(e.SystemStartStoppedEndpoint, envID)
+}
+
+func (e ArcaneApiEndpoints) SystemConvert(envID string) string {
+	return fmt.Sprintf(e.SystemConvertEndpoint, envID)
+}
+
+func (e ArcaneApiEndpoints) SystemUpgrade(envID string) string {
+	return fmt.Sprintf(e.SystemUpgradeEndpoint, envID)
+}
+
+func (e ArcaneApiEndpoints) SystemUpgradeCheck(envID string) string {
+	return fmt.Sprintf(e.SystemUpgradeCheckEndpoint, envID)
+}
+
 // Updater endpoints
 func (e ArcaneApiEndpoints) UpdaterStatus(envID string) string {
 	return fmt.Sprintf(e.UpdaterStatusEndpoint, envID)
@@ -479,11 +562,17 @@ func (e ArcaneApiEndpoints) UpdaterHistory(envID string) string {
 }
 
 // Job schedule endpoints
-func (e ArcaneApiEndpoints) JobSchedules() string { return e.JobSchedulesEndpoint }
+func (e ArcaneApiEndpoints) JobSchedules(envID string) string {
+	return fmt.Sprintf(e.JobSchedulesEndpoint, envID)
+}
 
 // Settings endpoints
 func (e ArcaneApiEndpoints) Settings(envID string) string {
 	return fmt.Sprintf(e.SettingsEndpoint, envID)
+}
+
+func (e ArcaneApiEndpoints) SettingsPublic(envID string) string {
+	return fmt.Sprintf(e.SettingsPublicEndpoint, envID)
 }
 
 // Notification endpoints
@@ -491,8 +580,20 @@ func (e ArcaneApiEndpoints) NotificationsApprise(envID string) string {
 	return fmt.Sprintf(e.NotificationsAppriseEndpoint, envID)
 }
 
+func (e ArcaneApiEndpoints) NotificationsAppriseTest(envID string) string {
+	return fmt.Sprintf(e.NotificationsAppriseTestEndpoint, envID)
+}
+
 func (e ArcaneApiEndpoints) NotificationsSettings(envID string) string {
 	return fmt.Sprintf(e.NotificationsSettingsEndpoint, envID)
+}
+
+func (e ArcaneApiEndpoints) NotificationSettingsProvider(envID, provider string) string {
+	return fmt.Sprintf(e.NotificationSettingsProviderEndpoint, envID, provider)
+}
+
+func (e ArcaneApiEndpoints) NotificationsTestProvider(envID, provider string) string {
+	return fmt.Sprintf(e.NotificationsTestProviderEndpoint, envID, provider)
 }
 
 // Container Registry endpoints
@@ -526,8 +627,48 @@ func (e ArcaneApiEndpoints) TemplatesVariables() string { return e.TemplatesVari
 func (e ArcaneApiEndpoints) TemplateContent(id string) string {
 	return fmt.Sprintf(e.TemplateContentEndpoint, id)
 }
+func (e ArcaneApiEndpoints) TemplateDownload(id string) string {
+	return fmt.Sprintf(e.TemplateDownloadEndpoint, id)
+}
+func (e ArcaneApiEndpoints) TemplateFetch() string { return e.TemplateFetchEndpoint }
 
 // Dashboard endpoints
 func (e ArcaneApiEndpoints) DashboardActionItems(envID string) string {
 	return fmt.Sprintf(e.DashboardActionItemsEndpoint, envID)
 }
+
+// GitOps Sync endpoints
+func (e ArcaneApiEndpoints) GitOpsSyncs(envID string) string {
+	return fmt.Sprintf(e.GitOpsSyncsEndpoint, envID)
+}
+func (e ArcaneApiEndpoints) GitOpsSync(envID, syncID string) string {
+	return fmt.Sprintf(e.GitOpsSyncEndpoint, envID, syncID)
+}
+func (e ArcaneApiEndpoints) GitOpsSyncStatus(envID, syncID string) string {
+	return fmt.Sprintf(e.GitOpsSyncStatusEndpoint, envID, syncID)
+}
+func (e ArcaneApiEndpoints) GitOpsSyncTrigger(envID, syncID string) string {
+	return fmt.Sprintf(e.GitOpsSyncTriggerEndpoint, envID, syncID)
+}
+func (e ArcaneApiEndpoints) GitOpsSyncFiles(envID, syncID string) string {
+	return fmt.Sprintf(e.GitOpsSyncFilesEndpoint, envID, syncID)
+}
+func (e ArcaneApiEndpoints) GitOpsSyncsImport(envID string) string {
+	return fmt.Sprintf(e.GitOpsSyncsImportEndpoint, envID)
+}
+
+// Git Repository endpoints
+func (e ArcaneApiEndpoints) GitRepositories() string { return e.GitRepositoriesEndpoint }
+func (e ArcaneApiEndpoints) GitRepository(id string) string {
+	return fmt.Sprintf(e.GitRepositoryEndpoint, id)
+}
+func (e ArcaneApiEndpoints) GitRepositoryTest(id string) string {
+	return fmt.Sprintf(e.GitRepositoryTestEndpoint, id)
+}
+func (e ArcaneApiEndpoints) GitRepositoryBranches(id string) string {
+	return fmt.Sprintf(e.GitRepositoryBranchesEndpoint, id)
+}
+func (e ArcaneApiEndpoints) GitRepositoryFiles(id string) string {
+	return fmt.Sprintf(e.GitRepositoryFilesEndpoint, id)
+}
+func (e ArcaneApiEndpoints) GitRepositoriesSync() string { return e.GitRepositoriesSyncEndpoint }

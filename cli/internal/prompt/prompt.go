@@ -28,7 +28,7 @@ func Select(label string, options []string) (int, error) {
 		items[i] = selectItem{index: i, title: option}
 	}
 
-	model := newSelectModel(label, items)
+	model := newSelectModel(items)
 	program := tea.NewProgram(model)
 	finalModel, err := program.Run()
 	if err != nil {
@@ -45,7 +45,24 @@ func Select(label string, options []string) (int, error) {
 	if result.choice < 0 {
 		return -1, fmt.Errorf("selection required")
 	}
+	if result.choice >= len(options) {
+		return -1, fmt.Errorf("selection out of range")
+	}
+
+	clearScreenAndShowSelection(label, options[result.choice])
 	return result.choice, nil
+}
+
+func clearScreenAndShowSelection(label, selected string) {
+	// Clear visible terminal content and place cursor at top-left.
+	fmt.Print("\033[H\033[2J")
+
+	if label == "" {
+		fmt.Printf("Selected: %s\n\n", selected)
+		return
+	}
+
+	fmt.Printf("Selected %s: %s\n\n", label, selected)
 }
 
 type selectItem struct {
@@ -63,10 +80,10 @@ type selectModel struct {
 	canceled bool
 }
 
-func newSelectModel(label string, items []list.Item) selectModel {
+func newSelectModel(items []list.Item) selectModel {
 	delegate := list.NewDefaultDelegate()
 	model := selectModel{list: list.New(items, delegate, 0, 0), choice: -1}
-	model.list.Title = fmt.Sprintf("Select %s", label)
+	model.list.Title = ""
 	model.list.SetShowStatusBar(false)
 	model.list.SetFilteringEnabled(true)
 	model.list.SetShowHelp(true)

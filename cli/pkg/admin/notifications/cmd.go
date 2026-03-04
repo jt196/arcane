@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/getarcaneapp/arcane/cli/internal/client"
+	"github.com/getarcaneapp/arcane/cli/internal/cmdutil"
 	"github.com/getarcaneapp/arcane/cli/internal/output"
 	"github.com/getarcaneapp/arcane/cli/internal/types"
 	"github.com/getarcaneapp/arcane/types/base"
@@ -12,7 +13,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var jsonOutput bool
+var (
+	jsonOutput     bool
+	notifForceFlag bool
+)
 
 // NotificationsCmd is the parent command for notification operations
 var NotificationsCmd = &cobra.Command{
@@ -21,8 +25,18 @@ var NotificationsCmd = &cobra.Command{
 	Short:   "Manage notifications",
 }
 
+var appriseCmd = &cobra.Command{
+	Use:   "apprise",
+	Short: "Manage Apprise configuration",
+}
+
+var settingsCmd = &cobra.Command{
+	Use:   "settings",
+	Short: "Manage notification settings",
+}
+
 var appriseGetCmd = &cobra.Command{
-	Use:          "apprise-get",
+	Use:          "get",
 	Short:        "Get Apprise configuration",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -62,7 +76,7 @@ var appriseGetCmd = &cobra.Command{
 }
 
 var settingsGetCmd = &cobra.Command{
-	Use:          "settings-get",
+	Use:          "get",
 	Short:        "Get notification settings",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -107,10 +121,126 @@ var settingsGetCmd = &cobra.Command{
 	},
 }
 
+var appriseTestCmd = &cobra.Command{
+	Use:          "test",
+	Short:        "Test Apprise notification",
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := client.NewFromConfig()
+		if err != nil {
+			return err
+		}
+
+		resp, err := c.Post(cmd.Context(), types.Endpoints.NotificationsAppriseTest(c.EnvID()), nil)
+		if err != nil {
+			return fmt.Errorf("failed to test apprise: %w", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		if err := cmdutil.EnsureSuccessStatus(resp); err != nil {
+			return fmt.Errorf("apprise test failed: %w", err)
+		}
+
+		if jsonOutput {
+			var result base.ApiResponse[any]
+			if err := json.NewDecoder(resp.Body).Decode(&result); err == nil {
+				if resultBytes, err := json.MarshalIndent(result.Data, "", "  "); err == nil {
+					fmt.Println(string(resultBytes))
+				}
+			}
+			return nil
+		}
+
+		output.Success("Apprise notification test successful")
+		return nil
+	},
+}
+
+var settingsDeleteCmd = &cobra.Command{
+	Use:          "delete <provider>",
+	Short:        "Delete notification provider settings",
+	Args:         cobra.ExactArgs(1),
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if !notifForceFlag {
+			confirmed, err := cmdutil.Confirm(cmd, fmt.Sprintf("Are you sure you want to delete notification settings for %s?", args[0]))
+			if err != nil {
+				return err
+			}
+			if !confirmed {
+				fmt.Println("Cancelled")
+				return nil
+			}
+		}
+
+		c, err := client.NewFromConfig()
+		if err != nil {
+			return err
+		}
+
+		resp, err := c.Delete(cmd.Context(), types.Endpoints.NotificationSettingsProvider(c.EnvID(), args[0]))
+		if err != nil {
+			return fmt.Errorf("failed to delete notification settings: %w", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		if err := cmdutil.EnsureSuccessStatus(resp); err != nil {
+			return fmt.Errorf("failed to delete notification settings: %w", err)
+		}
+
+		output.Success("Notification settings for %s deleted successfully", args[0])
+		return nil
+	},
+}
+
+var testProviderCmd = &cobra.Command{
+	Use:          "test <provider>",
+	Short:        "Test a notification provider",
+	Args:         cobra.ExactArgs(1),
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := client.NewFromConfig()
+		if err != nil {
+			return err
+		}
+
+		resp, err := c.Post(cmd.Context(), types.Endpoints.NotificationsTestProvider(c.EnvID(), args[0]), nil)
+		if err != nil {
+			return fmt.Errorf("failed to test notification provider: %w", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		if err := cmdutil.EnsureSuccessStatus(resp); err != nil {
+			return fmt.Errorf("notification test failed: %w", err)
+		}
+
+		if jsonOutput {
+			var result base.ApiResponse[any]
+			if err := json.NewDecoder(resp.Body).Decode(&result); err == nil {
+				if resultBytes, err := json.MarshalIndent(result.Data, "", "  "); err == nil {
+					fmt.Println(string(resultBytes))
+				}
+			}
+			return nil
+		}
+
+		output.Success("Notification test for %s successful", args[0])
+		return nil
+	},
+}
+
 func init() {
-	NotificationsCmd.AddCommand(appriseGetCmd)
-	NotificationsCmd.AddCommand(settingsGetCmd)
+	NotificationsCmd.AddCommand(appriseCmd)
+	NotificationsCmd.AddCommand(settingsCmd)
+	NotificationsCmd.AddCommand(testProviderCmd)
+
+	appriseCmd.AddCommand(appriseGetCmd)
+	appriseCmd.AddCommand(appriseTestCmd)
+
+	settingsCmd.AddCommand(settingsGetCmd)
+	settingsCmd.AddCommand(settingsDeleteCmd)
 
 	appriseGetCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
+	appriseTestCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 	settingsGetCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
+	settingsDeleteCmd.Flags().BoolVarP(&notifForceFlag, "force", "f", false, "Force deletion without confirmation")
+	settingsDeleteCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
+	testProviderCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 }
