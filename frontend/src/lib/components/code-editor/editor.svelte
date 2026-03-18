@@ -654,8 +654,6 @@
 		<span>{diagnosticSummary.errors} errors</span>
 		<span>{diagnosticSummary.warnings} warnings</span>
 		<span>Schema: {diagnosticSummary.schemaStatus}</span>
-		<span>Unresolved vars: {diagnosticSummary.unresolvedVariables.length}</span>
-		<span>Secrets: {diagnosticSummary.secretWarnings}</span>
 		<span>Ln {diagnosticSummary.cursorLine}, Col {diagnosticSummary.cursorCol}</span>
 		<span>Diagnostics: {countCurrentDiagnostics()}</span>
 		{#if !validationReady}
