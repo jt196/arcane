@@ -585,7 +585,16 @@ func (h *ProjectHandler) GetProjectFile(ctx context.Context, input *GetProjectFi
 
 	file, err := h.projectService.GetProjectFileContent(ctx, input.ProjectID, input.RelativePath)
 	if err != nil {
-		return nil, huma.Error404NotFound(err.Error())
+		switch {
+		case errors.Is(err, services.ErrProjectFileBadRequest):
+			return nil, huma.Error400BadRequest(err.Error())
+		case errors.Is(err, services.ErrProjectFileForbidden):
+			return nil, huma.Error403Forbidden(err.Error())
+		case errors.Is(err, services.ErrProjectFileNotFound):
+			return nil, huma.Error404NotFound("project file not found")
+		default:
+			return nil, huma.Error500InternalServerError("internal error")
+		}
 	}
 
 	return &GetProjectFileOutput{

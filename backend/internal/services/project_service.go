@@ -50,6 +50,12 @@ type ProjectService struct {
 	composeNameToProjID map[string]string
 }
 
+var (
+	ErrProjectFileBadRequest = errors.New("invalid project file request")
+	ErrProjectFileForbidden  = errors.New("forbidden project file path")
+	ErrProjectFileNotFound   = errors.New("project file not found")
+)
+
 func NewProjectService(db *database.DB, settingsService *SettingsService, eventService *EventService, imageService *ImageService, dockerService *DockerClientService, buildService *BuildService, cfg *config.Config) *ProjectService {
 	return &ProjectService{
 		db:              db,
@@ -681,7 +687,7 @@ func (s *ProjectService) GetProjectFileContent(ctx context.Context, projectID, r
 		return project.IncludeFile{}, err
 	}
 	if strings.TrimSpace(relativePath) == "" {
-		return project.IncludeFile{}, fmt.Errorf("relative path is required")
+		return project.IncludeFile{}, fmt.Errorf("%w: relative path is required", ErrProjectFileBadRequest)
 	}
 
 	composeFile, detectErr := projects.DetectComposeFile(proj.Path)
@@ -716,29 +722,35 @@ func (s *ProjectService) GetProjectFileContent(ctx context.Context, projectID, r
 		return project.IncludeFile{}, fmt.Errorf("failed to resolve file path: %w", err)
 	}
 	if !projects.IsSafeSubdirectory(absProjectPath, absFilePath) {
-		return project.IncludeFile{}, fmt.Errorf("file path is outside project directory")
+		return project.IncludeFile{}, fmt.Errorf("%w: file path is outside project directory", ErrProjectFileForbidden)
 	}
 
 	info, err := os.Lstat(absFilePath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return project.IncludeFile{}, ErrProjectFileNotFound
+		}
 		return project.IncludeFile{}, fmt.Errorf("failed to stat file: %w", err)
 	}
 	if info.IsDir() {
-		return project.IncludeFile{}, fmt.Errorf("path refers to a directory")
+		return project.IncludeFile{}, fmt.Errorf("%w: path refers to a directory", ErrProjectFileBadRequest)
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
-		return project.IncludeFile{}, fmt.Errorf("symlink files are not supported")
+		return project.IncludeFile{}, fmt.Errorf("%w: symlink files are not supported", ErrProjectFileForbidden)
 	}
 	if info.Size() > 1024*1024 {
-		return project.IncludeFile{}, fmt.Errorf("file exceeds maximum size")
+		return project.IncludeFile{}, fmt.Errorf("%w: file exceeds maximum size", ErrProjectFileBadRequest)
 	}
 
 	content, err := os.ReadFile(absFilePath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return project.IncludeFile{}, ErrProjectFileNotFound
+		}
 		return project.IncludeFile{}, fmt.Errorf("failed to read file: %w", err)
 	}
 	if projects.IsBinaryProjectFileContent(content) {
-		return project.IncludeFile{}, fmt.Errorf("binary files are not supported")
+		return project.IncludeFile{}, fmt.Errorf("%w: binary files are not supported", ErrProjectFileBadRequest)
 	}
 
 	return project.IncludeFile{

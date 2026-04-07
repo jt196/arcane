@@ -117,13 +117,11 @@ export class ProjectService extends BaseAPIService {
 	}
 
 	async getProjectFileForEnvironment(environmentId: string, projectId: string, relativePath: string): Promise<IncludeFile> {
-		const response = await this.handleResponse<{ project?: IncludeFile; success?: boolean }>(
+		return this.handleResponse<IncludeFile>(
 			this.api.get(`/environments/${environmentId}/projects/${projectId}/file`, {
 				params: { relativePath }
 			})
 		);
-
-		return response.project ? response.project : (response as IncludeFile);
 	}
 
 	async getProjectStatusCounts(): Promise<ProjectStatusCounts> {
