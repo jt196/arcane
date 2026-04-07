@@ -223,7 +223,7 @@ func collectProjectDirectoryFilesInternal(
 
 		if includeContent {
 			content, err := root.ReadFile(relPath)
-			if err != nil || isBinaryProjectFileContentInternal(content) {
+			if err != nil || IsBinaryProjectFileContent(content) {
 				continue
 			}
 			file.Content = string(content)
@@ -235,13 +235,9 @@ func collectProjectDirectoryFilesInternal(
 	return nil
 }
 
-func isBinaryProjectFileContentInternal(content []byte) bool {
+func IsBinaryProjectFileContent(content []byte) bool {
 	checkSize := min(len(content), 512)
 	return slices.Contains(content[:checkSize], 0)
-}
-
-func IsBinaryProjectFileContent(content []byte) bool {
-	return isBinaryProjectFileContentInternal(content)
 }
 
 // CreateUniqueDir creates a unique directory within the allowed projectsRoot.

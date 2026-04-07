@@ -50,12 +50,6 @@ type ProjectService struct {
 	composeNameToProjID map[string]string
 }
 
-var (
-	ErrProjectFileBadRequest = errors.New("invalid project file request")
-	ErrProjectFileForbidden  = errors.New("forbidden project file path")
-	ErrProjectFileNotFound   = errors.New("project file not found")
-)
-
 func NewProjectService(db *database.DB, settingsService *SettingsService, eventService *EventService, imageService *ImageService, dockerService *DockerClientService, buildService *BuildService, cfg *config.Config) *ProjectService {
 	return &ProjectService{
 		db:              db,
@@ -687,7 +681,7 @@ func (s *ProjectService) GetProjectFileContent(ctx context.Context, projectID, r
 		return project.IncludeFile{}, err
 	}
 	if strings.TrimSpace(relativePath) == "" {
-		return project.IncludeFile{}, fmt.Errorf("%w: relative path is required", ErrProjectFileBadRequest)
+		return project.IncludeFile{}, &common.ProjectFileBadRequestError{Err: fmt.Errorf("relative path is required")}
 	}
 
 	composeFile, detectErr := projects.DetectComposeFile(proj.Path)
@@ -698,7 +692,7 @@ func (s *ProjectService) GetProjectFileContent(ctx context.Context, projectID, r
 		envLoader := projects.NewEnvLoader(projectsDirectory, filepath.Dir(composeFile), autoInjectEnv)
 		envMap, _, _ := envLoader.LoadEnvironment(ctx)
 
-		includes, parseErr := projects.ParseIncludes(composeFile, envMap)
+		includes, parseErr := projects.ParseIncludes(composeFile, envMap, true)
 		if parseErr == nil {
 			for _, inc := range includes {
 				if inc.RelativePath == relativePath {
@@ -722,35 +716,32 @@ func (s *ProjectService) GetProjectFileContent(ctx context.Context, projectID, r
 		return project.IncludeFile{}, fmt.Errorf("failed to resolve file path: %w", err)
 	}
 	if !projects.IsSafeSubdirectory(absProjectPath, absFilePath) {
-		return project.IncludeFile{}, fmt.Errorf("%w: file path is outside project directory", ErrProjectFileForbidden)
+		return project.IncludeFile{}, &common.ProjectFileForbiddenError{Err: fmt.Errorf("file path is outside project directory")}
 	}
 
 	info, err := os.Lstat(absFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return project.IncludeFile{}, ErrProjectFileNotFound
+			return project.IncludeFile{}, &common.ProjectFileNotFoundError{}
 		}
 		return project.IncludeFile{}, fmt.Errorf("failed to stat file: %w", err)
 	}
 	if info.IsDir() {
-		return project.IncludeFile{}, fmt.Errorf("%w: path refers to a directory", ErrProjectFileBadRequest)
+		return project.IncludeFile{}, &common.ProjectFileBadRequestError{Err: fmt.Errorf("path refers to a directory")}
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
-		return project.IncludeFile{}, fmt.Errorf("%w: symlink files are not supported", ErrProjectFileForbidden)
-	}
-	if info.Size() > 1024*1024 {
-		return project.IncludeFile{}, fmt.Errorf("%w: file exceeds maximum size", ErrProjectFileBadRequest)
+		return project.IncludeFile{}, &common.ProjectFileForbiddenError{Err: fmt.Errorf("symlink files are not supported")}
 	}
 
 	content, err := os.ReadFile(absFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return project.IncludeFile{}, ErrProjectFileNotFound
+			return project.IncludeFile{}, &common.ProjectFileNotFoundError{}
 		}
 		return project.IncludeFile{}, fmt.Errorf("failed to read file: %w", err)
 	}
 	if projects.IsBinaryProjectFileContent(content) {
-		return project.IncludeFile{}, fmt.Errorf("%w: binary files are not supported", ErrProjectFileBadRequest)
+		return project.IncludeFile{}, &common.ProjectFileBadRequestError{Err: fmt.Errorf("binary files are not supported")}
 	}
 
 	return project.IncludeFile{
@@ -770,7 +761,7 @@ func (s *ProjectService) enrichWithIncludeFiles(ctx context.Context, projectPath
 		envLoader := projects.NewEnvLoader(projectsDirectory, filepath.Dir(composeFile), autoInjectEnv)
 		envMap, _, _ := envLoader.LoadEnvironment(ctx)
 
-		includes, parseErr := projects.ParseIncludesMetadata(composeFile, envMap)
+		includes, parseErr := projects.ParseIncludes(composeFile, envMap, false)
 		if parseErr == nil {
 			var includeFiles []project.IncludeFile
 			for _, inc := range includes {

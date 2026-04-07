@@ -33,19 +33,9 @@ type IncludeFile struct {
 	Content      string `json:"content"`
 }
 
-// ParseIncludesMetadata reads a compose file and extracts include directives without
-// embedding include file content in the returned payload.
-func ParseIncludesMetadata(composeFilePath string, envMap EnvMap) ([]IncludeFile, error) {
-	return parseIncludesInternal(composeFilePath, envMap, false)
-}
-
 // ParseIncludes reads a compose file and extracts all include directives.
 // envMap is used to expand variables (e.g., ${VAR}) in include paths.
-func ParseIncludes(composeFilePath string, envMap EnvMap) ([]IncludeFile, error) {
-	return parseIncludesInternal(composeFilePath, envMap, true)
-}
-
-func parseIncludesInternal(composeFilePath string, envMap EnvMap, includeContent bool) ([]IncludeFile, error) {
+func ParseIncludes(composeFilePath string, envMap EnvMap, includeContent bool) ([]IncludeFile, error) {
 	content, err := os.ReadFile(composeFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read compose file: %w", err)
@@ -110,7 +100,7 @@ func parseIncludeItemInternal(item any, baseDir string, envMap EnvMap, includeCo
 	}
 	fullPath = filepath.Clean(fullPath)
 
-	content := ""
+	var content string
 	if includeContent {
 		fileContent, err := os.ReadFile(fullPath)
 		if err != nil {
