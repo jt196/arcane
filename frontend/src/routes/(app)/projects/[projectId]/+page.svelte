@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Project } from '$lib/types/project.type';
+	import type { IncludeFile, Project } from '$lib/types/project.type';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import * as TreeView from '$lib/components/ui/tree-view/index.js';
 	import * as Card from '$lib/components/ui/card';
@@ -65,8 +65,7 @@
 	let originalEnvContent = $state(untrack(() => data.editorState.originalEnvContent || ''));
 	let includeFilesState = $state<Record<string, string>>({});
 	let originalIncludeFiles = $state<Record<string, string>>({});
-	let projectFileLoading = $state<Record<string, boolean>>({});
-	let projectFileErrors = $state<Record<string, string | null>>({});
+	let projectFilePromises: Record<string, Promise<IncludeFile> | undefined> = {};
 	const globalVariableMap = $derived.by(() =>
 		Object.fromEntries((data.globalVariables ?? []).map((item) => [item.key, item.value]))
 	);
@@ -425,16 +424,8 @@
 
 	type ProjectFileKind = 'include' | 'directory';
 
-	function getProjectFileKey(kind: ProjectFileKind, relativePath: string): string {
-		return `${kind}:${relativePath}`;
-	}
-
-	function isProjectFileLoading(kind: ProjectFileKind, relativePath: string): boolean {
-		return !!projectFileLoading[getProjectFileKey(kind, relativePath)];
-	}
-
-	function getProjectFileError(kind: ProjectFileKind, relativePath: string): string | null {
-		return projectFileErrors[getProjectFileKey(kind, relativePath)] ?? null;
+	function getProjectFileKey(projectId: string, kind: ProjectFileKind, relativePath: string): string {
+		return `${projectId}:${kind}:${relativePath}`;
 	}
 
 	function updateLoadedProjectFile(kind: ProjectFileKind, relativePath: string, content: string) {
@@ -466,47 +457,45 @@
 		};
 	}
 
-	async function ensureProjectFileContentLoaded(kind: ProjectFileKind, relativePath: string) {
+	function getProjectFileResource(kind: ProjectFileKind, relativePath: string): IncludeFile | Promise<IncludeFile> {
 		const currentProjectId = project?.id;
-		if (!currentProjectId) return;
+		if (!currentProjectId) {
+			throw new Error('Project is not loaded');
+		}
 
 		const targetFile =
 			kind === 'include'
 				? project?.includeFiles?.find((file) => file.relativePath === relativePath)
 				: project?.directoryFiles?.find((file) => file.relativePath === relativePath);
 
-		if (!targetFile || targetFile.content !== undefined) {
-			return;
+		if (!targetFile) {
+			throw new Error('Project file not found');
 		}
 
-		const requestKey = getProjectFileKey(kind, relativePath);
-		if (projectFileLoading[requestKey]) {
-			return;
+		if (targetFile.content !== undefined) {
+			return targetFile;
 		}
 
-		projectFileLoading = {
-			...projectFileLoading,
-			[requestKey]: true
-		};
-		projectFileErrors = {
-			...projectFileErrors,
-			[requestKey]: null
-		};
+		const requestKey = getProjectFileKey(currentProjectId, kind, relativePath);
+		const existingPromise = projectFilePromises[requestKey];
+		if (existingPromise) {
+			return existingPromise;
+		}
 
-		const result = await tryCatch(projectService.getProjectFile(currentProjectId, relativePath));
-		if (result.error) {
-			projectFileErrors = {
-				...projectFileErrors,
-				[requestKey]: result.error.message || m.common_refresh_failed({ resource: relativePath })
+		const promise = (async () => {
+			const file = await projectService.getProjectFile(currentProjectId, relativePath);
+			updateLoadedProjectFile(kind, relativePath, file.content ?? '');
+			return {
+				...file,
+				content: file.content ?? ''
 			};
-		} else {
-			updateLoadedProjectFile(kind, relativePath, result.data.content ?? '');
-		}
+		})().finally(() => {
+			delete projectFilePromises[requestKey];
+		});
 
-		projectFileLoading = {
-			...projectFileLoading,
-			[requestKey]: false
-		};
+		projectFilePromises[requestKey] = promise;
+
+		return promise;
 	}
 
 	function selectComposeFile() {
@@ -517,21 +506,16 @@
 		selectedFile = 'env';
 	}
 
-	async function selectIncludeFile(relativePath: string) {
+	function selectIncludeFile(relativePath: string) {
 		selectedFile = relativePath;
-		await ensureProjectFileContentLoaded('include', relativePath);
 	}
 
-	async function selectDirectoryFile(relativePath: string) {
+	function selectDirectoryFile(relativePath: string) {
 		selectedFile = `dir:${relativePath}`;
-		await ensureProjectFileContentLoaded('directory', relativePath);
 	}
 
-	async function toggleIncludeFileTab(relativePath: string) {
+	function toggleIncludeFileTab(relativePath: string) {
 		selectedIncludeTab = selectedIncludeTab === relativePath ? null : relativePath;
-		if (selectedIncludeTab) {
-			await ensureProjectFileContentLoaded('include', selectedIncludeTab);
-		}
 	}
 
 	const allComposeContents = $derived.by(() => {
@@ -897,40 +881,32 @@
 											{@const dirRelPath = selectedFile.slice(4)}
 											{@const dirFile = project?.directoryFiles?.find((f) => f.relativePath === dirRelPath)}
 											{#if dirFile}
-												{@const isLoadingDirFile = isProjectFileLoading('directory', dirRelPath)}
-												{@const dirFileError = getProjectFileError('directory', dirRelPath)}
-												{#if isLoadingDirFile}
+												{#await getProjectFileResource('directory', dirRelPath)}
 													<div class="text-muted-foreground flex h-full min-h-0 items-center justify-center rounded-lg border">
 														{m.common_loading()}
 													</div>
-												{:else if dirFileError}
-													<div class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm">
-														{dirFileError}
-													</div>
-												{:else}
+												{:then loadedFile}
 													<CodePanel
 														open={true}
-														title={dirFile.relativePath}
+														title={loadedFile.relativePath}
 														language="yaml"
-														value={dirFile.content ?? ''}
+														value={loadedFile.content ?? ''}
 														readOnly={true}
 													/>
+													{:catch error}
+														<div class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm">
+															{error.message}
+														</div>
+													{/await}
 												{/if}
-											{/if}
 										{:else}
 											{@const includeFile = project?.includeFiles?.find((f) => f.relativePath === selectedFile)}
 											{#if includeFile}
-												{@const isLoadingIncludeFile = isProjectFileLoading('include', includeFile.relativePath)}
-												{@const includeFileError = getProjectFileError('include', includeFile.relativePath)}
-												{#if isLoadingIncludeFile}
+												{#await getProjectFileResource('include', includeFile.relativePath)}
 													<div class="text-muted-foreground flex h-full min-h-0 items-center justify-center rounded-lg border">
 														{m.common_loading()}
 													</div>
-												{:else if includeFileError}
-													<div class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm">
-														{includeFileError}
-													</div>
-												{:else}
+												{:then _loadedFile}
 													<CodePanel
 														bind:open={includeFilesPanelStates[includeFile.relativePath]}
 														title={includeFile.relativePath}
@@ -943,8 +919,12 @@
 														enableDiff={true}
 														editorContext={codeEditorContext}
 													/>
+													{:catch error}
+														<div class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm">
+															{error.message}
+														</div>
+													{/await}
 												{/if}
-											{/if}
 										{/if}
 									</div>
 								</div>
@@ -1060,40 +1040,32 @@
 												{@const dirRelPath = selectedFile.slice(4)}
 												{@const dirFile = project?.directoryFiles?.find((f) => f.relativePath === dirRelPath)}
 												{#if dirFile}
-													{@const isLoadingDirFile = isProjectFileLoading('directory', dirRelPath)}
-													{@const dirFileError = getProjectFileError('directory', dirRelPath)}
-													{#if isLoadingDirFile}
+													{#await getProjectFileResource('directory', dirRelPath)}
 														<div class="text-muted-foreground flex h-full min-h-0 items-center justify-center rounded-lg border">
 															{m.common_loading()}
 														</div>
-													{:else if dirFileError}
-														<div class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm">
-															{dirFileError}
-														</div>
-													{:else}
+													{:then loadedFile}
 														<CodePanel
 															open={true}
-															title={dirFile.relativePath}
+															title={loadedFile.relativePath}
 															language="yaml"
-															value={dirFile.content ?? ''}
+															value={loadedFile.content ?? ''}
 															readOnly={true}
 														/>
-													{/if}
+													{:catch error}
+														<div class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm">
+															{error.message}
+														</div>
+													{/await}
 												{/if}
 											{:else}
 												{@const includeFile = project?.includeFiles?.find((f) => f.relativePath === selectedFile)}
 												{#if includeFile}
-													{@const isLoadingIncludeFile = isProjectFileLoading('include', includeFile.relativePath)}
-													{@const includeFileError = getProjectFileError('include', includeFile.relativePath)}
-													{#if isLoadingIncludeFile}
+													{#await getProjectFileResource('include', includeFile.relativePath)}
 														<div class="text-muted-foreground flex h-full min-h-0 items-center justify-center rounded-lg border">
 															{m.common_loading()}
 														</div>
-													{:else if includeFileError}
-														<div class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm">
-															{includeFileError}
-														</div>
-													{:else}
+													{:then _loadedFile}
 														<CodePanel
 															bind:open={includeFilesPanelStates[includeFile.relativePath]}
 															title={includeFile.relativePath}
@@ -1106,8 +1078,12 @@
 															enableDiff={true}
 															editorContext={codeEditorContext}
 														/>
+														{:catch error}
+															<div class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm">
+																{error.message}
+															</div>
+														{/await}
 													{/if}
-												{/if}
 											{/if}
 										</div>
 									{/snippet}
@@ -1136,17 +1112,11 @@
 								{#if selectedIncludeTab}
 									{@const includeFile = project?.includeFiles?.find((f) => f.relativePath === selectedIncludeTab)}
 									{#if includeFile}
-										{@const isLoadingIncludeFile = isProjectFileLoading('include', includeFile.relativePath)}
-										{@const includeFileError = getProjectFileError('include', includeFile.relativePath)}
-										{#if isLoadingIncludeFile}
+										{#await getProjectFileResource('include', includeFile.relativePath)}
 											<div class="text-muted-foreground flex h-full min-h-0 items-center justify-center rounded-lg border">
 												{m.common_loading()}
 											</div>
-										{:else if includeFileError}
-											<div class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm">
-												{includeFileError}
-											</div>
-										{:else}
+										{:then _loadedFile}
 											<CodePanel
 												bind:open={includeFilesPanelStates[includeFile.relativePath]}
 												title={includeFile.relativePath}
@@ -1159,8 +1129,12 @@
 												enableDiff={true}
 												editorContext={codeEditorContext}
 											/>
+											{:catch error}
+												<div class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm">
+													{error.message}
+												</div>
+											{/await}
 										{/if}
-									{/if}
 								{:else if isTablet.current}
 									<div class="flex min-h-0 flex-1 flex-col gap-4">
 										<CodePanel
