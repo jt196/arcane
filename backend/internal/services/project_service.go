@@ -10,7 +10,6 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +19,7 @@ import (
 	composetypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/getarcaneapp/arcane/backend/internal/common"
+	"github.com/getarcaneapp/arcane/backend/internal/config"
 	"github.com/getarcaneapp/arcane/backend/internal/database"
 	"github.com/getarcaneapp/arcane/backend/internal/models"
 	dockerutil "github.com/getarcaneapp/arcane/backend/pkg/dockerutil"
@@ -44,12 +44,13 @@ type ProjectService struct {
 	imageService    *ImageService
 	dockerService   *DockerClientService
 	buildService    *BuildService
+	config          *config.Config
 
 	composeNameCacheMu  sync.RWMutex
 	composeNameToProjID map[string]string
 }
 
-func NewProjectService(db *database.DB, settingsService *SettingsService, eventService *EventService, imageService *ImageService, dockerService *DockerClientService, buildService *BuildService) *ProjectService {
+func NewProjectService(db *database.DB, settingsService *SettingsService, eventService *EventService, imageService *ImageService, dockerService *DockerClientService, buildService *BuildService, cfg *config.Config) *ProjectService {
 	return &ProjectService{
 		db:              db,
 		settingsService: settingsService,
@@ -57,6 +58,7 @@ func NewProjectService(db *database.DB, settingsService *SettingsService, eventS
 		imageService:    imageService,
 		dockerService:   dockerService,
 		buildService:    buildService,
+		config:          cfg,
 	}
 }
 
@@ -716,87 +718,12 @@ func (s *ProjectService) enrichWithDirectoryFiles(ctx context.Context, projectPa
 		shownFiles[inc.RelativePath] = true
 	}
 
-	var dirFiles []project.IncludeFile
-
-	root, err := os.OpenRoot(projectPath)
-	if err != nil {
-		slog.WarnContext(ctx, "Failed to open project root for directory scan", "error", err, "path", projectPath)
-		resp.DirectoryFiles = dirFiles
-		return
-	}
-	defer func() { _ = root.Close() }()
-
-	err = s.collectDirectoryFiles(root, ".", projectPath, shownFiles, &dirFiles)
-
+	dirFiles, err := projects.ReadProjectDirectoryFiles(projectPath, shownFiles, s.config.ProjectScanMaxDepth, s.config.ProjectScanSkipDirs)
 	if err != nil {
 		slog.WarnContext(ctx, "Failed to scan project directory files", "error", err, "path", projectPath)
 	}
 
 	resp.DirectoryFiles = dirFiles
-}
-
-func (s *ProjectService) collectDirectoryFiles(
-	root *os.Root,
-	relDir string,
-	projectPath string,
-	shownFiles map[string]bool,
-	dirFiles *[]project.IncludeFile,
-) error {
-	dir, err := root.Open(relDir)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = dir.Close() }()
-
-	entries, err := dir.ReadDir(-1)
-	if err != nil {
-		return err
-	}
-
-	for _, entry := range entries {
-		relPath := entry.Name()
-		if relDir != "." {
-			relPath = filepath.Join(relDir, entry.Name())
-		}
-		if entry.Type()&os.ModeSymlink != 0 {
-			continue
-		}
-		if entry.IsDir() {
-			if entry.Name() == ".git" {
-				continue
-			}
-			if err := s.collectDirectoryFiles(root, relPath, projectPath, shownFiles, dirFiles); err != nil {
-				slog.Debug("Skipping unreadable project subdirectory", "relativePath", relPath, "error", err)
-			}
-			continue
-		}
-		if shownFiles[relPath] {
-			continue
-		}
-
-		info, err := entry.Info()
-		if err != nil || info.Size() > 1024*1024 {
-			continue
-		}
-
-		content, err := root.ReadFile(relPath)
-		if err != nil || isBinaryProjectFileContent(content) {
-			continue
-		}
-
-		*dirFiles = append(*dirFiles, project.IncludeFile{
-			Path:         filepath.Join(projectPath, relPath),
-			RelativePath: relPath,
-			Content:      string(content),
-		})
-	}
-
-	return nil
-}
-
-func isBinaryProjectFileContent(content []byte) bool {
-	checkSize := min(len(content), 512)
-	return slices.Contains(content[:checkSize], 0)
 }
 
 func (s *ProjectService) enrichWithGitOpsInfo(ctx context.Context, proj *models.Project, resp *project.Details) {
