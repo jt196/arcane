@@ -121,6 +121,10 @@ func parseIncludeItemInternal(item any, baseDir string, envMap EnvMap, includeCo
 			relativePath = rel
 		}
 	}
+	relativePath = filepath.ToSlash(filepath.Clean(relativePath))
+	if relativePath == "." {
+		relativePath = filepath.Base(fullPath)
+	}
 
 	return IncludeFile{
 		Path:         fullPath,
