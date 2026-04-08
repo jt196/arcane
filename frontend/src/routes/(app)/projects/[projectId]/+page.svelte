@@ -218,9 +218,7 @@
 	}
 
 	function buildIncludeFilesMap(details: Project): Record<string, string> {
-		return Object.fromEntries(
-			(details.includeFiles ?? []).map((file) => [file.relativePath, file.content ?? ''])
-		);
+		return Object.fromEntries((details.includeFiles ?? []).map((file) => [file.relativePath, file.content ?? '']));
 	}
 
 	function withLoadedProjectFileContent(details: Project): Project {
@@ -240,8 +238,7 @@
 			directoryFiles: (details.directoryFiles ?? []).map((file) => ({
 				...file,
 				content:
-					file.content ??
-					existingDirectoryFiles.find((existingFile) => existingFile.relativePath === file.relativePath)?.content
+					file.content ?? existingDirectoryFiles.find((existingFile) => existingFile.relativePath === file.relativePath)?.content
 			}))
 		};
 	}
@@ -803,11 +800,7 @@
 													{/snippet}
 												</TreeView.File>
 
-												<TreeView.File
-													name=".env"
-													onclick={selectEnvFile}
-													class={selectedFile === 'env' ? 'bg-accent' : ''}
-												>
+												<TreeView.File name=".env" onclick={selectEnvFile} class={selectedFile === 'env' ? 'bg-accent' : ''}>
 													{#snippet icon()}
 														<FileTextIcon class="size-4 text-green-500" />
 													{/snippet}
@@ -893,12 +886,14 @@
 														value={loadedFile.content ?? ''}
 														readOnly={true}
 													/>
-													{:catch error}
-														<div class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm">
-															{error.message}
-														</div>
-													{/await}
-												{/if}
+												{:catch error}
+													<div
+														class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm"
+													>
+														{error.message}
+													</div>
+												{/await}
+											{/if}
 										{:else}
 											{@const includeFile = project?.includeFiles?.find((f) => f.relativePath === selectedFile)}
 											{#if includeFile}
@@ -919,12 +914,14 @@
 														enableDiff={true}
 														editorContext={codeEditorContext}
 													/>
-													{:catch error}
-														<div class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm">
-															{error.message}
-														</div>
-													{/await}
-												{/if}
+												{:catch error}
+													<div
+														class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm"
+													>
+														{error.message}
+													</div>
+												{/await}
+											{/if}
 										{/if}
 									</div>
 								</div>
@@ -960,11 +957,7 @@
 														{/snippet}
 													</TreeView.File>
 
-													<TreeView.File
-														name=".env"
-														onclick={selectEnvFile}
-														class={selectedFile === 'env' ? 'bg-accent' : ''}
-													>
+													<TreeView.File name=".env" onclick={selectEnvFile} class={selectedFile === 'env' ? 'bg-accent' : ''}>
 														{#snippet icon()}
 															<FileTextIcon class="size-4 text-green-500" />
 														{/snippet}
@@ -1053,7 +1046,9 @@
 															readOnly={true}
 														/>
 													{:catch error}
-														<div class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm">
+														<div
+															class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm"
+														>
 															{error.message}
 														</div>
 													{/await}
@@ -1078,12 +1073,14 @@
 															enableDiff={true}
 															editorContext={codeEditorContext}
 														/>
-														{:catch error}
-															<div class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm">
-																{error.message}
-															</div>
-														{/await}
-													{/if}
+													{:catch error}
+														<div
+															class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm"
+														>
+															{error.message}
+														</div>
+													{/await}
+												{/if}
 											{/if}
 										</div>
 									{/snippet}
@@ -1129,12 +1126,14 @@
 												enableDiff={true}
 												editorContext={codeEditorContext}
 											/>
-											{:catch error}
-												<div class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm">
-													{error.message}
-												</div>
-											{/await}
-										{/if}
+										{:catch error}
+											<div
+												class="text-destructive flex h-full min-h-0 items-center justify-center rounded-lg border px-4 text-sm"
+											>
+												{error.message}
+											</div>
+										{/await}
+									{/if}
 								{:else if isTablet.current}
 									<div class="flex min-h-0 flex-1 flex-col gap-4">
 										<CodePanel
@@ -1183,7 +1182,7 @@
 											<div class="flex min-h-0 flex-1 flex-col">
 												<CodePanel
 													bind:open={composeOpen}
-													title="compose.yaml"
+													title={composeFileName}
 													language="yaml"
 													bind:value={$inputs.composeContent.value}
 													error={$inputs.composeContent.error ?? undefined}
